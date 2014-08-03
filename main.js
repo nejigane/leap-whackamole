@@ -7,6 +7,8 @@ var Mole = function(radius) {
   this.mesh = new THREE.Mesh(capsuleGeometry, new THREE.MeshPhongMaterial({
     color: 0x994c00, specular: 0x444444, emissive: 0x994c00
   }));
+  this.radius = radius;
+  this.touched = false;
   this.state = 0;
   this.change();
 };
@@ -22,6 +24,13 @@ Mole.prototype = {
     case 0:
       this.dest = -120;
       break;
+    case 1:
+      if (this.touched) {
+        this.mesh.material.color.setHex(0x994c00);
+        this.mesh.material.emissive.setHex(0x994c00);
+        this.touched = false;
+      }
+      break;
     case 2:
       this.dest = 0;
       break;
@@ -29,6 +38,23 @@ Mole.prototype = {
     this.count = Math.floor(Math.random() * 60) + 10;
     this.state++;
     if (this.state == 4) this.state = 0;
+  },
+  check: function(position) {
+    if (!this.touched && this.isTouched(position)) {
+      this.touched = true;
+      this.mesh.material.color.setHex(0xff0000);
+      this.mesh.material.emissive.setHex(0xff0000);
+      this.state = 0;
+      this.change();
+      $(this).trigger('touched');
+    }
+  },
+  isTouched: function(position) {
+    return (this.mesh.position.x - this.radius <= position.x &&
+            position.x <= this.mesh.position.x + this.radius) &&
+      (this.mesh.position.z - this.radius <= position.z &&
+       position.z <= this.mesh.position.z + this.radius) &&
+      (0 <= position.y && position.y <= this.mesh.position.y + this.radius * 2);    
   }
 };
 
@@ -69,6 +95,10 @@ var moles = [];
 for (var i = 0; i < 9; ++i) {
   var mole = new Mole(50);
   mole.mesh.position.set((i % 3 - 1) * 200, 0, (Math.floor(i / 3) - 1) * 200);
+  $(mole).on('touched', function(e) {
+    var score = $('#score p').text()/1;
+    $('#score p').text(score + 1);
+  });
   moles.push(mole);
   scene.add(mole.mesh);
 }
@@ -118,18 +148,25 @@ controller.on('handFound', function(hand) {
 
 (function animate() {
   requestAnimationFrame(animate);
-  
-  moles.forEach(function(mole) {
-    mole.tick();
-  });
-
+ 
   var frame = controller.frame();
   for (var i = 0; i < frame.hands.length; i++) {
     var hand = frame.hands[i];
-    cursors[hand.id].position.set(hand.palmPosition[0] * 2,
-                                  hand.palmPosition[1] * 3 - 300,
-                                  hand.palmPosition[2] * 2);
+    var position = {
+      x: hand.palmPosition[0] * 2,
+      y: hand.palmPosition[1] * 3 - 300,
+      z: hand.palmPosition[2] * 2
+    };
+    cursors[hand.id].position.set(position.x, position.y, position.z);
   }
+
+  moles.forEach(function(mole, i) {
+    mole.tick();
+    for (var id in cursors) {
+      mole.check(cursors[id].position);
+    }
+  });
+
 
   renderer.render(scene, camera);
   stats.update();
