@@ -26,7 +26,7 @@ Mole.prototype = {
       this.dest = 0;
       break;
     }
-    this.count = Math.floor(Math.random() * 60) + 1;
+    this.count = Math.floor(Math.random() * 60) + 10;
     this.state++;
     if (this.state == 4) this.state = 0;
   }
@@ -46,6 +46,21 @@ function createGround() {
   ground.rotation.x = - Math.PI / 2;  
   ground.position.y = - 30;
   return ground;
+}
+
+function createCursor() {
+  var circle = new THREE.Mesh(
+    new THREE.CircleGeometry(50, 32),
+    new THREE.MeshPhongMaterial({
+      color: 0xdc143c,
+      specular: 0x444444,
+      emissive: 0xdc143c,
+      transparent: true,
+      opacity: 0.4
+    })
+  );
+  circle.rotation.x = - Math.PI / 2;  
+  return circle;
 }
 
 var scene = new THREE.Scene();
@@ -72,7 +87,7 @@ camera.position.set(0, 500, 800);
 camera.lookAt(scene.position);
 
 var renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setClearColorHex(0x7ec0ee);
+renderer.setClearColor(0x7ec0ee);
 document.body.appendChild(renderer.domElement);
 
 window.addEventListener('resize', resize, false);
@@ -90,13 +105,17 @@ function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function vectorToString(vector) {
-  return "(" + vector[0].toFixed(1) + ", "
-             + vector[1].toFixed(1) + ", "
-             + vector[2].toFixed(1) + ")";
-}
+var cursors = {};  
+var controller = new Leap.Controller().use('handEntry');
+controller.setBackground(true);
+controller.on('handFound', function(hand) {
+  cursors[hand.id] = createCursor();
+  scene.add(cursors[hand.id]);
+}).on('handLost', function(hand) {
+  scene.remove(cursors[hand.id]);
+  delete cursors[hand.id];
+}).connect();
 
-var controller = new Leap.Controller();
 (function animate() {
   requestAnimationFrame(animate);
   
@@ -107,10 +126,9 @@ var controller = new Leap.Controller();
   var frame = controller.frame();
   for (var i = 0; i < frame.hands.length; i++) {
     var hand = frame.hands[i];
-    console.log("Hand ID: " + hand.id);
-    console.log("Palm position: " + vectorToString(hand.palmPosition) + " mm");
-    console.log("Palm normal: " + vectorToString(hand.palmNormal) + " mm");
-    console.log("Palm velocity: " + vectorToString(hand.palmVelocity) + " mm");
+    cursors[hand.id].position.set(hand.palmPosition[0] * 2,
+                                  hand.palmPosition[1] * 3 - 300,
+                                  hand.palmPosition[2] * 2);
   }
 
   renderer.render(scene, camera);
