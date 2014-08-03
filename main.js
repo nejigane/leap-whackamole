@@ -167,7 +167,6 @@ controller.on('handFound', function(hand) {
     }
   });
 
-
   renderer.render(scene, camera);
   stats.update();
 })();
